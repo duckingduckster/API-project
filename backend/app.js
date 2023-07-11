@@ -13,42 +13,44 @@ const isProduction = environment === 'production';
 const app = express();
 
 
+
 app.use(morgan('dev'));
 
 app.use(cookieParser());
 app.use(express.json());
 
 if (!isProduction) {
-    app.use(cors());
+  app.use(cors());
 }
 
 app.use(
-    helmet.crossOriginResourcePolicy({
-        policy: "cross-origin"
+  helmet.crossOriginResourcePolicy({
+    policy: "cross-origin"
+  })
+  );
+
+  app.use(
+    csurf({
+      cookie: {
+        secure: isProduction,
+        sameSite: isProduction && "Lax",
+        httpOnly: true
+      }
     })
     );
 
-    app.use(
-        csurf({
-            cookie: {
-                secure: isProduction,
-                sameSite: isProduction && "Lax",
-                httpOnly: true
-            }
-        })
-        );
+    app.use(routes);
+    app.use((_req, _res, next) => {
+      const err = new Error("The requested resource couldn't be found.");
+      err.title = "Resource Not Found";
+      err.errors = { message: "The requested resource couldn't be found." };
+      err.status = 404;
+      next(err);
+    });
 
-        app.use((_req, _res, next) => {
-            const err = new Error("The requested resource couldn't be found.");
-            err.title = "Resource Not Found";
-            err.errors = { message: "The requested resource couldn't be found." };
-            err.status = 404;
-            next(err);
-          });
+    const { ValidationError } = require('sequelize');
 
-const { ValidationError } = require('sequelize');
-
-app.use((err, _req, _res, next) => {
+    app.use((err, _req, _res, next) => {
   if (err instanceof ValidationError) {
     let errors = {};
     for (let error of err.errors) {
@@ -71,5 +73,4 @@ app.use((err, _req, res, _next) => {
     });
   });
 
-  app.use(routes);
   module.exports = app;
